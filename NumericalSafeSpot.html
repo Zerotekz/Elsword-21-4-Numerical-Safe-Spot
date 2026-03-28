@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Numeral Safe Spot</title>
+  <style>
+    body { background: #111; color: white; font-family: sans-serif; display: flex; justify-content: center; padding-top: 20px; }
+    #game { width: 1000px; text-align: center; position: relative; }
+    #modeDisplay { font-size: 24px; font-weight: bold; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; }
+    #timer { position: absolute; top: 10px; right: 20px; font-size: 22px; color: #ff6666; }
+    .platform-group { display: flex; justify-content: center; margin: 10px; gap: 20px; flex-wrap: wrap; }
+    .platform { width: 80px; height: 80px; border: 2px solid #555; background-color: #222; display: flex; align-items: center; justify-content: center; }
+    .platform img { width: 70px; height: 70px; }
+    #chatlog { background: #222; padding: 10px; margin-top: 20px; min-height: 150px; text-align: left; }
+    input { padding: 6px; font-size: 16px; margin: 10px; width: 400px; }
+    button { padding: 8px 20px; font-size: 16px; margin: 10px; }
+    #controls, #recap { margin-top: 10px; }
+    #result { margin-top: 20px; font-size: 18px; font-weight: bold; color: yellow; }
+    .comp-view { filter: brightness(0.5); }
+    .recap-row { margin: 6px 0; }
+    .correct-tile { outline: 4px solid lime; box-shadow: 0 0 10px lime; }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="modeDisplay">Numeral Safe Spot</div>
+    <div id="timer">⏱️ 60</div>
+    <button onclick="startGame()" id="startBtn">Start Game</button>
+
+    <div class="platform-group" id="topRow" style="display:none;"></div>
+    <div class="platform-group" id="bottomRow" style="display:none;"></div>
+
+    <div id="chatlog"></div>
+
+    <div id="controls" style="display:none;">
+      <input id="inputBox" placeholder="Enter briefing" />
+    </div>
+
+    <div id="recap" style="display:none;"></div>
+    <div id="result"></div>
+    <button onclick="startGame()" id="retryBtn" style="display:none;">🔁 Retry</button
+	<div style="text-align:center; margin-top:10px; font-size:12px; color:#777;">
+		Updated by Zerotekz — may still contain a few bugs.
+	
+	</div>
+  </div>
+
+<script>
+const TOTAL_PLATFORMS = 12;
+const PLATFORMS_PER_FLOOR = 6;
+
+const SYMBOLS = ["Ⅰ","Ⅱ","Ⅲ","Ⅳ","Ⅴ","Ⅵ","Ⅶ","Ⅷ"];
+const SYMBOL_TO_NUM = { "Ⅰ":"1","Ⅱ":"2","Ⅲ":"3","Ⅳ":"4","Ⅴ":"5","Ⅵ":"6","Ⅶ":"7","Ⅷ":"8" };
+const SYMBOL_IMG = Object.fromEntries(SYMBOLS.map((s,i)=>[s,`symbol_${i+1}.png`]));
+
+const topRow = document.getElementById("topRow");
+const bottomRow = document.getElementById("bottomRow");
+const chatlog = document.getElementById("chatlog");
+const inputBox = document.getElementById("inputBox");
+const modeDisplay = document.getElementById("modeDisplay");
+const resultBox = document.getElementById("result");
+const controls = document.getElementById("controls");
+const retryBtn = document.getElementById("retryBtn");
+const startBtn = document.getElementById("startBtn");
+const recapBox = document.getElementById("recap");
+const timerDisplay = document.getElementById("timer");
+
+let mode = "", symbols = [], step = 0;
+let playerTopIdx = [], playerBotIdx = [], compTopIdx = [], compBotIdx = [];
+let timer = null, timeLeft = 40;
+
+function shuffle(arr){ return arr.sort(()=>Math.random()-0.5); }
+function getRandomInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+function assignVisibility(){
+  const topCount = getRandomInt(2,4);
+  const botCount = getRandomInt(2,4);
+
+  const top = shuffle([...Array(6).keys()]);
+  playerTopIdx = top.slice(0,topCount);
+  compTopIdx = top.slice(topCount);
+
+  const bot = shuffle([...Array(6).keys()].map(i=>i+6));
+  playerBotIdx = bot.slice(0,botCount);
+  compBotIdx = bot.slice(botCount);
+}
+
+function generateSymbols(){
+  const main = SYMBOLS[Math.floor(Math.random()*8)];
+  const others = SYMBOLS.filter(s=>s!==main);
+
+  // 6 main + 6 others
+  const filler = shuffle([...others,...others,...others]).slice(0,6);
+  const base = Array(6).fill(main).concat(filler);
+
+  symbols = shuffle(base);
+}
+
+function startTimer(){
+  clearInterval(timer);
+  timeLeft=60;
+  timerDisplay.textContent=`⏱️ ${timeLeft}`;
+  timer=setInterval(()=>{
+    timeLeft--;
+    timerDisplay.textContent=`⏱️ ${timeLeft}`;
+    if(timeLeft<=0){
+      clearInterval(timer);
+      resultBox.innerHTML="⏰ Time's up!";
+      inputBox.disabled=true;
+      retryBtn.style.display="inline-block";
+    }
+  },1000);
+}
+
+function startGame(){
+  clearInterval(timer);
+  step=0;
+  symbols=[];
+  chatlog.innerHTML='';
+  resultBox.innerHTML='';
+  recapBox.innerHTML='';
+  inputBox.value='';
+  inputBox.disabled=false;
+  recapBox.style.display="none";
+  retryBtn.style.display="none";
+  controls.style.display="block";
+  startBtn.style.display="none";
+
+  mode=Math.random()<0.5?"open":"closed";
+  const img = mode==="open"?"open.png":"close.png";
+  modeDisplay.innerHTML=`Mode: <img src="${img}" style="height:40px;margin-left:10px;">`;
+
+  generateSymbols();
+  assignVisibility();
+
+  renderRow(topRow,[0,1,2,3,4,5]);
+  renderRow(bottomRow,[6,7,8,9,10,11]);
+
+  topRow.style.display="flex";
+  bottomRow.style.display="none";
+
+  startTimer();
+}
+
+function renderRow(row,indices){
+  row.innerHTML='';
+  const visible = row.id==="topRow"?playerTopIdx:playerBotIdx;
+
+  indices.forEach(i=>{
+    const div=document.createElement("div");
+    div.className="platform";
+    if(visible.includes(i)){
+      const img=document.createElement("img");
+      img.src=SYMBOL_IMG[symbols[i]];
+      div.appendChild(img);
+    }
+    row.appendChild(div);
+  });
+}
+
+function formatBrief(indices,visible){
+  const pairs=[];
+  for(let i=0;i<indices.length;i+=2){
+    const a=indices[i], b=indices[i+1];
+    const c1=visible.includes(a)?SYMBOL_TO_NUM[symbols[a]]:'x';
+    const c2=visible.includes(b)?SYMBOL_TO_NUM[symbols[b]]:'x';
+    pairs.push(c1+c2);
+  }
+  return pairs.join(" / ");
+}
+
+function handleInput(value){
+  if(!value.trim()) return;
+
+  const top=[0,1,2,3,4,5];
+  const bot=[6,7,8,9,10,11];
+
+  switch(step){
+    case 0:
+      chatlog.innerHTML+=`<div>Top: ${value}</div>`;
+      chatlog.innerHTML+=`<div>Comp: ${formatBrief(top,compTopIdx)}</div>`;
+      topRow.style.display="none";
+      bottomRow.style.display="flex";
+      break;
+
+    case 1:
+      chatlog.innerHTML+=`<div>Bottom: ${value}</div>`;
+      chatlog.innerHTML+=`<div>Comp: ${formatBrief(bot,compBotIdx)}</div>`;
+      break;
+
+    case 2:
+      chatlog.innerHTML+=`<div>Top Numbers: ${value}</div>`;
+      break;
+
+    case 3:
+      chatlog.innerHTML+=`<div>Bottom Numbers: ${value}</div>`;
+      break;
+
+    case 4:
+      judge(value);
+      recapImages();
+      retryBtn.style.display="inline-block";
+      clearInterval(timer);
+      inputBox.disabled=true;
+      break;
+  }
+
+  step++;
+  inputBox.value='';
+}
+
+function judge(answer){
+  const counts={};
+  symbols.forEach(s=>{
+    const n=SYMBOL_TO_NUM[s];
+    counts[n]=(counts[n]||0)+1;
+  });
+
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const main=sorted[0][0];
+  const count=sorted[0][1];
+
+  if(count!==6){
+    resultBox.innerHTML="❌ Board Error!";
+    return;
+  }
+
+  if(mode==="open"){
+    resultBox.innerHTML = answer===main
+      ? `✅ Correct! ${main}`
+      : `❌ Wrong! ${main}`;
+  }else{
+    const safe=Object.keys(counts).filter(n=>n!==main);
+    resultBox.innerHTML = safe.includes(answer)
+      ? `✅ Correct!`
+      : `❌ Safe were: ${safe.join(", ")}`;
+  }
+}
+
+function recapImages(){
+  recapBox.style.display="block";
+  recapBox.innerHTML="<h3>Review</h3>";
+
+  const counts={};
+  symbols.forEach(s=>{
+    const n=SYMBOL_TO_NUM[s];
+    counts[n]=(counts[n]||0)+1;
+  });
+
+  const main=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+
+  const safeIdx=symbols.map((s,i)=>{
+    return (mode==="open"
+      ? SYMBOL_TO_NUM[s]===main
+      : SYMBOL_TO_NUM[s]!==main) ? i : null;
+  }).filter(i=>i!==null);
+
+  const show=(title,indices)=>{
+    const row=document.createElement("div");
+    row.innerHTML=`<strong>${title}</strong><br>`;
+
+    indices.forEach(i=>{
+      const img=document.createElement("img");
+      img.src=SYMBOL_IMG[symbols[i]];
+      img.style.width="60px";
+      img.style.margin="4px";
+
+      if(safeIdx.includes(i)) img.classList.add("correct-tile");
+      row.appendChild(img);
+    });
+
+    recapBox.appendChild(row);
+  };
+
+  show("Top",[0,1,2,3,4,5]);
+  show("Bottom",[6,7,8,9,10,11]);
+}
+
+inputBox.addEventListener("keydown",e=>{
+  if(e.key==="Enter") handleInput(inputBox.value);
+});
+</script>
+</body>
+</html>
