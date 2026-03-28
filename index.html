@@ -38,11 +38,11 @@
 
     <div id="recap" style="display:none;"></div>
     <div id="result"></div>
-    <button onclick="startGame()" id="retryBtn" style="display:none;">🔁 Retry</button
-	<div style="text-align:center; margin-top:10px; font-size:12px; color:#777;">
-		Updated by Zerotekz — may still contain a few bugs.
-	
-	</div>
+    <button onclick="startGame()" id="retryBtn" style="display:none;">🔁 Retry</button>
+
+    <div style="text-align:center; margin-top:10px; font-size:12px; color:#777;">
+      Updated by Zerotekz — may still contain a few bugs.
+    </div>
   </div>
 
 <script>
@@ -89,7 +89,6 @@ function generateSymbols(){
   const main = SYMBOLS[Math.floor(Math.random()*8)];
   const others = SYMBOLS.filter(s=>s!==main);
 
-  // 6 main + 6 others
   const filler = shuffle([...others,...others,...others]).slice(0,6);
   const base = Array(6).fill(main).concat(filler);
 
@@ -140,6 +139,7 @@ function startGame(){
   bottomRow.style.display="none";
 
   startTimer();
+  updatePlaceholder();
 }
 
 function renderRow(row,indices){
@@ -167,6 +167,18 @@ function formatBrief(indices,visible){
     pairs.push(c1+c2);
   }
   return pairs.join(" / ");
+}
+
+function updatePlaceholder() {
+  if (step <= 1) {
+    inputBox.placeholder = "Enter briefing (e.g., x1 / 4x / xx / 82)";
+  } else if (step === 2) {
+    inputBox.placeholder = "Gather numbers (Top)";
+  } else if (step === 3) {
+    inputBox.placeholder = "Gather numbers (Bottom)";
+  } else {
+    inputBox.placeholder = "Enter final answer";
+  }
 }
 
 function handleInput(value){
@@ -207,6 +219,7 @@ function handleInput(value){
 
   step++;
   inputBox.value='';
+  updatePlaceholder();
 }
 
 function judge(answer){
